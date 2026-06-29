@@ -1,0 +1,105 @@
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+
+    background:#072542;
+
+    color:white;
+
+    font-family:"Barlow",sans-serif;
+
+}
+
+header{
+
+    text-align:center;
+
+    padding:25px;
+
+}
+
+main{
+
+    width:95%;
+
+    margin:auto;
+
+}
+
+.round h2{
+
+    margin-bottom:20px;
+
+    text-align:center;
+
+}
+
+.match{
+
+    width:320px;
+
+    background:#13395d;
+
+    border:1px solid #4d7ca5;
+
+    border-radius:8px;
+
+    overflow:hidden;
+
+    margin:auto;
+
+    box-shadow:0 0 12px rgba(0,0,0,.35);
+
+}
+
+.team{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:10px;
+
+    padding:12px;
+
+}
+
+.team:first-child{
+
+    border-bottom:1px solid rgba(255,255,255,.15);
+
+}
+
+.flag{
+
+    font-size:22px;
+
+}
+
+.name{
+
+    flex:1;
+
+}
+
+.score{
+
+    width:45px;
+
+    height:34px;
+
+    text-align:center;
+
+    border:none;
+
+    border-radius:5px;
+
+    font-size:18px;
+
+    font-weight:bold;
+
+}

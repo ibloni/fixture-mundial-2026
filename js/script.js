@@ -1,0 +1,1 @@
+console.log("Fixture Mundial 2026");
