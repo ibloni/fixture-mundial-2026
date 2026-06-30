@@ -9,48 +9,57 @@ const getTeam = (code) => window.teams?.[code] ?? {
     status: "pending"
 };
 
-function renderTeam(code) {
-    const team = getTeam(code);
-    const statusClass = team.status === "confirmed" ? "confirmed" : "pending";
-
-    return `
-        <li class="team ${statusClass}">
-            <span class="team-flag">${team.flag}</span>
-            <span class="team-name">${team.name}</span>
-            <span class="team-code">${team.code}</span>
-        </li>
-    `;
-}
-
-function createGroupFixtures(teamCodes) {
+function buildFixtures(teamCodes) {
+    const teams = teamCodes.slice(0, 4);
     return [
-        { home: teamCodes[0], away: teamCodes[1], homeGoals: "", awayGoals: "" },
-        { home: teamCodes[2], away: teamCodes[3], homeGoals: "", awayGoals: "" },
-        { home: teamCodes[0], away: teamCodes[2], homeGoals: "", awayGoals: "" },
-        { home: teamCodes[1], away: teamCodes[3], homeGoals: "", awayGoals: "" },
-        { home: teamCodes[0], away: teamCodes[3], homeGoals: "", awayGoals: "" },
-        { home: teamCodes[1], away: teamCodes[2], homeGoals: "", awayGoals: "" }
+        { home: teams[0], away: teams[1], homeGoals: "", awayGoals: "" },
+        { home: teams[2], away: teams[3], homeGoals: "", awayGoals: "" },
+        { home: teams[0], away: teams[2], homeGoals: "", awayGoals: "" },
+        { home: teams[1], away: teams[3], homeGoals: "", awayGoals: "" },
+        { home: teams[0], away: teams[3], homeGoals: "", awayGoals: "" },
+        { home: teams[1], away: teams[2], homeGoals: "", awayGoals: "" }
     ];
 }
 
+function buildBracketTemplate() {
+    return Array.from({ length: 16 }, () => ({ home: "", away: "" }));
+}
+
 function buildInitialState() {
+    const groupEntries = Object.entries(window.groups ?? {});
     return {
-        groupResults: Object.fromEntries(
-            Object.entries(window.groups ?? {}).map(([groupName, teamCodes]) => [groupName, createGroupFixtures(teamCodes)])
-        )
+        groups: Object.fromEntries(groupEntries.map(([groupName, teamCodes]) => [groupName, [...teamCodes]])),
+        realResults: Object.fromEntries(groupEntries.map(([groupName, teamCodes]) => [groupName, buildFixtures(teamCodes)])),
+        forecastResults: Object.fromEntries(groupEntries.map(([groupName, teamCodes]) => [groupName, buildFixtures(teamCodes)])),
+        realBracket: buildBracketTemplate(),
+        forecastBracket: buildBracketTemplate()
     };
 }
 
 let state = JSON.parse(JSON.stringify(buildInitialState()));
 
-function getGroupResults(groupName) {
-    return state.groupResults[groupName] ?? createGroupFixtures(window.groups?.[groupName] ?? []);
+function getGroupTeams(groupName) {
+    const teams = state.groups?.[groupName] ?? [];
+    return teams.filter(Boolean);
 }
 
-function getGroupStandings(groupName) {
-    const teamCodes = window.groups?.[groupName] ?? [];
-    const fixtures = getGroupResults(groupName);
+function getGroupResults(groupName, mode) {
+    const results = mode === "forecast" ? state.forecastResults : state.realResults;
+    return results[groupName] ?? buildFixtures(getGroupTeams(groupName));
+}
 
+function updateGroupResult(mode, groupName, fixtureIndex, side, value) {
+    const results = mode === "forecast" ? state.forecastResults : state.realResults;
+    const fixture = results[groupName]?.[fixtureIndex];
+    if (!fixture) {
+        return;
+    }
+    fixture[side === "home" ? "homeGoals" : "awayGoals"] = value;
+}
+
+function getGroupStandings(groupName, mode) {
+    const teamCodes = getGroupTeams(groupName);
+    const fixtures = getGroupResults(groupName, mode);
     const table = teamCodes.map((code) => ({
         code,
         played: 0,
@@ -66,7 +75,6 @@ function getGroupStandings(groupName) {
     fixtures.forEach((fixture) => {
         const home = table.find((entry) => entry.code === fixture.home);
         const away = table.find((entry) => entry.code === fixture.away);
-
         if (!home || !away) {
             return;
         }
@@ -107,48 +115,27 @@ function getGroupStandings(groupName) {
     });
 }
 
-function getGroupSummary() {
-    return Object.entries(window.groups ?? {}).map(([groupName]) => ({
+function getGroupSummary(mode) {
+    return Object.entries(state.groups ?? {}).map(([groupName]) => ({
         groupName,
-        standings: getGroupStandings(groupName)
+        standings: getGroupStandings(groupName, mode)
     }));
 }
 
-function buildRoundOf32() {
-    const groups = getGroupSummary();
-    const winners = groups.map((item) => item.standings[0].code);
-    const runnersUp = groups.map((item) => item.standings[1].code);
-    const thirdPlaces = groups.map((item) => item.standings[2].code).sort((a, b) => {
-        const teamA = getTeam(a);
-        const teamB = getTeam(b);
-        return teamA.name.localeCompare(teamB.name);
-    });
+function getBracketMatches(mode) {
+    return mode === "forecast" ? state.forecastBracket : state.realBracket;
+}
 
-    return [
-        { home: winners[0], away: runnersUp[1] },
-        { home: winners[2], away: runnersUp[3] },
-        { home: winners[4], away: runnersUp[5] },
-        { home: winners[6], away: runnersUp[7] },
-        { home: winners[8], away: runnersUp[9] },
-        { home: winners[10], away: runnersUp[11] },
-        { home: winners[1], away: runnersUp[0] },
-        { home: winners[3], away: runnersUp[2] },
-        { home: winners[5], away: runnersUp[4] },
-        { home: winners[7], away: runnersUp[6] },
-        { home: winners[9], away: runnersUp[8] },
-        { home: winners[11], away: runnersUp[10] },
-        { home: thirdPlaces[0], away: thirdPlaces[1] },
-        { home: thirdPlaces[2], away: thirdPlaces[3] },
-        { home: thirdPlaces[4], away: thirdPlaces[5] },
-        { home: thirdPlaces[6], away: thirdPlaces[7] }
-    ];
+function updateBracketMatch(mode, matchIndex, side, value) {
+    const bracket = mode === "forecast" ? state.forecastBracket : state.realBracket;
+    bracket[matchIndex][side] = value;
 }
 
 function renderHomeView() {
     return `
         <div class="card">
             <h2>Bienvenido</h2>
-            <p>El fixture ya quedó armado para la fase de grupos y las llaves. Podés cargar los resultados y ver cómo se arma el pronóstico automáticamente.</p>
+            <p>Ahora la app permite cargar los grupos reales, separar el resultado real del pronóstico y editar las llaves manualmente.</p>
             <div class="actions">
                 <button id="official">Ver grupos</button>
                 <button id="forecast">Ir al pronóstico</button>
@@ -157,16 +144,70 @@ function renderHomeView() {
     `;
 }
 
+function renderTeamSelector(groupName, index) {
+    const currentCode = state.groups[groupName]?.[index] || "";
+    const options = [...new Set([...(Object.keys(window.teams || {})), ...Object.values(state.groups).flatMap((codes) => codes.filter(Boolean))])];
+
+    return `
+        <label class="team-slot">
+            <span>Slot ${index + 1}</span>
+            <select data-role="team-slot" data-group="${groupName}" data-index="${index}">
+                <option value="">Por definir</option>
+                ${options.map((code) => `
+                    <option value="${code}" ${code === currentCode ? "selected" : ""}>${getTeam(code).flag} ${getTeam(code).name}</option>
+                `).join("")}
+            </select>
+        </label>
+    `;
+}
+
 function renderGroupsView() {
-    const groupsMarkup = Object.entries(window.groups ?? {}).map(([groupName, teamCodes]) => {
-        const standings = getGroupStandings(groupName);
-        const fixtures = getGroupResults(groupName);
+    const groupsMarkup = Object.entries(state.groups ?? {}).map(([groupName]) => {
+        const standings = getGroupStandings(groupName, "real");
+        const realFixtures = getGroupResults(groupName, "real");
+        const forecastFixtures = getGroupResults(groupName, "forecast");
 
         return `
             <section class="group-card">
                 <div class="group-card-header">
                     <h3>Grupo ${groupName}</h3>
-                    <p>Clasifican ${getTeam(standings[0].code).name} y ${getTeam(standings[1].code).name}</p>
+                    <p>Elegí los equipos del grupo y completá los resultados.</p>
+                </div>
+
+                <div class="team-slots-grid">
+                    ${[0, 1, 2, 3].map((index) => renderTeamSelector(groupName, index)).join("")}
+                </div>
+
+                <div class="results-panels">
+                    <div class="result-panel">
+                        <h4>Resultado real</h4>
+                        <div class="group-fixtures">
+                            ${realFixtures.map((fixture, index) => `
+                                <div class="fixture-row">
+                                    <span class="fixture-team">${getTeam(fixture.home).name}</span>
+                                    <input data-mode="real" data-group="${groupName}" data-fixture="${index}" data-side="home" type="number" min="0" inputmode="numeric" value="${fixture.homeGoals}">
+                                    <span class="fixture-separator">-</span>
+                                    <input data-mode="real" data-group="${groupName}" data-fixture="${index}" data-side="away" type="number" min="0" inputmode="numeric" value="${fixture.awayGoals}">
+                                    <span class="fixture-team">${getTeam(fixture.away).name}</span>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+
+                    <div class="result-panel">
+                        <h4>Pronóstico</h4>
+                        <div class="group-fixtures">
+                            ${forecastFixtures.map((fixture, index) => `
+                                <div class="fixture-row">
+                                    <span class="fixture-team">${getTeam(fixture.home).name}</span>
+                                    <input data-mode="forecast" data-group="${groupName}" data-fixture="${index}" data-side="home" type="number" min="0" inputmode="numeric" value="${fixture.homeGoals}">
+                                    <span class="fixture-separator">-</span>
+                                    <input data-mode="forecast" data-group="${groupName}" data-fixture="${index}" data-side="away" type="number" min="0" inputmode="numeric" value="${fixture.awayGoals}">
+                                    <span class="fixture-team">${getTeam(fixture.away).name}</span>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
                 </div>
 
                 <ol class="standings-list">
@@ -178,18 +219,6 @@ function renderGroupsView() {
                         </li>
                     `).join("")}
                 </ol>
-
-                <div class="group-fixtures">
-                    ${fixtures.map((fixture, index) => `
-                        <div class="fixture-row">
-                            <span class="fixture-team">${getTeam(fixture.home).name}</span>
-                            <input data-group="${groupName}" data-fixture="${index}" data-side="home" type="number" min="0" inputmode="numeric" value="${fixture.homeGoals}">
-                            <span class="fixture-separator">-</span>
-                            <input data-group="${groupName}" data-fixture="${index}" data-side="away" type="number" min="0" inputmode="numeric" value="${fixture.awayGoals}">
-                            <span class="fixture-team">${getTeam(fixture.away).name}</span>
-                        </div>
-                    `).join("")}
-                </div>
             </section>
         `;
     }).join("");
@@ -197,7 +226,7 @@ function renderGroupsView() {
     return `
         <div class="card">
             <h2>Fase de Grupos</h2>
-            <p>Completá los resultados de cada partido y la tabla se recalcula sola para definir los clasificados.</p>
+            <p>Podés corregir los equipos de cada grupo y completar los resultados reales y los pronósticos por separado.</p>
         </div>
 
         <div class="groups-grid">
@@ -207,39 +236,60 @@ function renderGroupsView() {
 }
 
 function renderBracketView() {
-    const groups = getGroupSummary();
-    const roundOf32 = buildRoundOf32();
+    const realGroups = getGroupSummary("real");
+    const forecastGroups = getGroupSummary("forecast");
+    const bracketModes = [
+        { key: "real", title: "Real", groups: realGroups, matches: getBracketMatches("real") },
+        { key: "forecast", title: "Pronóstico", groups: forecastGroups, matches: getBracketMatches("forecast") }
+    ];
 
     return `
         <div class="card">
-            <h2>Pronóstico y llaves</h2>
-            <p>Las llaves se van armando en base a los resultados de la fase de grupos.</p>
+            <h2>Llaves</h2>
+            <p>Podés ajustar las llaves y los cruces tanto para el resultado real como para tu pronóstico.</p>
         </div>
 
-        <div class="qualification-grid">
-            ${groups.map(({ groupName, standings }) => `
-                <div class="qualification-card">
-                    <h3>Grupo ${groupName}</h3>
-                    <p>1. ${getTeam(standings[0].code).name}</p>
-                    <p>2. ${getTeam(standings[1].code).name}</p>
-                </div>
-            `).join("")}
-        </div>
-
-        <div class="stage-card">
-            <h3>Octavos de Final</h3>
-            <div class="bracket-list">
-                ${roundOf32.map((match, index) => `
-                    <div class="match-card">
-                        <span class="match-label">Partido ${index + 1}</span>
-                        <div class="match-teams">
-                            <span class="team-chip">${getTeam(match.home).flag} ${getTeam(match.home).name}</span>
-                            <span class="match-vs">vs</span>
-                            <span class="team-chip">${getTeam(match.away).flag} ${getTeam(match.away).name}</span>
-                        </div>
+        <div class="bracket-grid">
+            ${bracketModes.map(({ key, title, groups, matches }) => `
+                <section class="stage-card">
+                    <h3>${title}</h3>
+                    <div class="qualification-grid">
+                        ${groups.map(({ groupName, standings }) => `
+                            <div class="qualification-card">
+                                <h3>Grupo ${groupName}</h3>
+                                <p>1. ${getTeam(standings[0].code).name}</p>
+                                <p>2. ${getTeam(standings[1].code).name}</p>
+                            </div>
+                        `).join("")}
                     </div>
-                `).join("")}
-            </div>
+
+                    <div class="bracket-list">
+                        ${matches.map((match, index) => {
+                            const availableTeams = groups.flatMap(({ standings }) => standings.map((team) => team.code));
+                            return `
+                                <div class="match-card">
+                                    <span class="match-label">Partido ${index + 1}</span>
+                                    <div class="match-editor">
+                                        <select data-mode="${key}" data-match="${index}" data-side="home">
+                                            <option value="">Elegí un equipo</option>
+                                            ${availableTeams.map((code) => `
+                                                <option value="${code}" ${match.home === code ? "selected" : ""}>${getTeam(code).flag} ${getTeam(code).name}</option>
+                                            `).join("")}
+                                        </select>
+                                        <span class="match-vs">vs</span>
+                                        <select data-mode="${key}" data-match="${index}" data-side="away">
+                                            <option value="">Elegí un equipo</option>
+                                            ${availableTeams.map((code) => `
+                                                <option value="${code}" ${match.away === code ? "selected" : ""}>${getTeam(code).flag} ${getTeam(code).name}</option>
+                                            `).join("")}
+                                        </select>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                </section>
+            `).join("")}
         </div>
     `;
 }
@@ -276,15 +326,24 @@ document.addEventListener("click", (event) => {
 document.addEventListener("change", (event) => {
     const target = event.target;
 
-    if (target.matches("input[data-group][data-fixture][data-side]")) {
-        const { group, fixture, side } = target.dataset;
-        const fixtures = state.groupResults[group];
-        const current = fixtures?.[fixture];
+    if (target.dataset.role === "team-slot") {
+        const { group, index } = target.dataset;
+        state.groups[group][index] = target.value;
+        loadView(currentView);
+        return;
+    }
 
-        if (current) {
-            current[side === "home" ? "homeGoals" : "awayGoals"] = target.value;
-            loadView(currentView);
-        }
+    if (target.matches("input[data-mode][data-group][data-fixture][data-side]")) {
+        const { mode, group, fixture, side } = target.dataset;
+        updateGroupResult(mode, group, fixture, side, target.value);
+        loadView(currentView);
+        return;
+    }
+
+    if (target.matches("select[data-mode][data-match][data-side]")) {
+        const { mode, match, side } = target.dataset;
+        updateBracketMatch(mode, match, side, target.value);
+        loadView(currentView);
     }
 });
 

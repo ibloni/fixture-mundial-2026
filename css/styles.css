@@ -36,6 +36,12 @@ nav {
     flex-wrap: wrap;
 }
 
+button,
+select,
+input {
+    font: inherit;
+}
+
 button {
     background: #1b5fa8;
     color: white;
@@ -43,8 +49,6 @@ button {
     padding: 12px 18px;
     border-radius: 8px;
     cursor: pointer;
-    font: inherit;
-    font-size: 15px;
     transition: .25s;
 }
 
@@ -87,7 +91,7 @@ main {
 
 .groups-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 16px;
 }
 
@@ -112,11 +116,48 @@ main {
     font-size: 14px;
 }
 
+.team-slots-grid {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.team-slot {
+    display: grid;
+    gap: 4px;
+    color: #d7e7f5;
+    font-size: 13px;
+}
+
+.team-slot select {
+    border: none;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, .12);
+    color: white;
+}
+
+.results-panels {
+    display: grid;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.result-panel {
+    padding: 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, .05);
+}
+
+.result-panel h4 {
+    color: #f4b400;
+    margin-bottom: 8px;
+}
+
 .standings-list {
     list-style: none;
     display: grid;
     gap: 8px;
-    margin-bottom: 12px;
 }
 
 .standing-row {
@@ -164,7 +205,8 @@ main {
     border-radius: 6px;
     padding: 6px 4px;
     text-align: center;
-    font: inherit;
+    background: rgba(255, 255, 255, .12);
+    color: white;
 }
 
 .fixture-team {
@@ -176,38 +218,16 @@ main {
     text-align: center;
 }
 
-.team-list {
-    list-style: none;
+.bracket-grid {
     display: grid;
-    gap: 8px;
-}
-
-.team {
-    display: grid;
-    grid-template-columns: 28px 1fr auto;
-    gap: 10px;
-    align-items: center;
-    min-height: 42px;
-    padding: 9px 10px;
-    background: rgba(255, 255, 255, .08);
-    border-radius: 8px;
-}
-
-.team.pending {
-    color: #aebfd0;
-}
-
-.team-code {
-    color: #9fc4e4;
-    font-size: 12px;
-    font-weight: 700;
+    gap: 18px;
 }
 
 .qualification-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 14px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
 
 .qualification-card,
@@ -232,7 +252,6 @@ main {
 .bracket-list {
     display: grid;
     gap: 10px;
-    margin-top: 12px;
 }
 
 .match-card {
@@ -251,23 +270,26 @@ main {
     letter-spacing: .08em;
 }
 
-.match-teams {
+.match-editor {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
 }
 
+.match-editor select {
+    flex: 1;
+    min-width: 180px;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, .12);
+    color: white;
+}
+
 .match-vs {
     color: #9fc4e4;
     font-weight: 700;
-}
-
-.team-chip {
-    background: rgba(255, 255, 255, .08);
-    padding: 8px 10px;
-    border-radius: 999px;
-    font-size: 14px;
 }
 
 @media (max-width: 560px) {
