@@ -37,7 +37,28 @@ function buildInitialState() {
     };
 }
 
-let state = JSON.parse(JSON.stringify(buildInitialState()));
+const STORAGE_KEY = "fixture2026-state";
+
+function loadState() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) return null;
+        return JSON.parse(saved);
+    } catch (error) {
+        console.warn("No se pudo cargar el estado guardado", error);
+        return null;
+    }
+}
+
+function saveState() {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch (error) {
+        console.warn("No se pudo guardar el estado", error);
+    }
+}
+
+let state = loadState() ?? JSON.parse(JSON.stringify(buildInitialState()));
 
 function getGroupTeams(groupName) {
     return window.groups?.[groupName] ?? [];
@@ -349,6 +370,15 @@ document.addEventListener("click", (event) => {
     if (event.target.id === "forecast") {
         loadView("bracket");
     }
+
+    if (event.target.id === "save-state") {
+        saveState();
+        const notice = document.createElement("div");
+        notice.className = "save-notice";
+        notice.textContent = "Datos guardados";
+        document.body.appendChild(notice);
+        setTimeout(() => notice.remove(), 1500);
+    }
 });
 
 document.addEventListener("change", (event) => {
@@ -357,8 +387,56 @@ document.addEventListener("change", (event) => {
     if (target.matches("input[data-mode][data-group][data-fixture][data-side]")) {
         const { mode, group, fixture, side } = target.dataset;
         updateGroupResult(mode, group, fixture, side, target.value);
+        saveState();
         loadView(currentView);
     }
 });
+
+function renderSaveButton() {
+    return `
+        <button id="save-state">Guardar datos</button>
+    `;
+}
+
+function renderHomeView() {
+    return `
+        <div class="card">
+            <h2>Bienvenido</h2>
+            <p>Los resultados se guardan automáticamente en tu navegador. También podés usar el botón para forzar el guardado.</p>
+            <div class="actions">
+                <button id="official">Cargar resultados</button>
+                <button id="forecast">Ver llaves</button>
+                ${renderSaveButton()}
+            </div>
+        </div>
+    `;
+}
+
+function renderBracketView() {
+    const bracketModes = [
+        { key: "real", title: "Llave por resultados reales" },
+        { key: "forecast", title: "Llave por pronostico" }
+    ];
+
+    return `
+        <div class="card">
+            <h2>Llaves</h2>
+            <p>Las llaves se arman automáticamente desde las tablas: pasan los dos primeros de cada grupo y los ocho mejores terceros.</p>
+            <div class="actions save-actions">
+                ${renderSaveButton()}
+            </div>
+        </div>
+
+        <div class="bracket-grid">
+            ${bracketModes.map(({ key, title }) => `
+                <section class="stage-card">
+                    <h3>${title}</h3>
+                    ${renderQualificationSummary(key)}
+                    ${renderRoundOf32(key)}
+                </section>
+            `).join("")}
+        </div>
+    `;
+}
 
 loadView("home");

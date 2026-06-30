@@ -89,6 +89,25 @@ main {
     flex-wrap: wrap;
 }
 
+.save-actions {
+    justify-content: flex-end;
+    margin-top: 14px;
+}
+
+.save-notice {
+    position: fixed;
+    left: 50%;
+    bottom: 24px;
+    transform: translateX(-50%);
+    padding: 12px 16px;
+    background: rgba(20, 110, 255, 0.95);
+    color: white;
+    border-radius: 999px;
+    box-shadow: 0 0 14px rgba(0, 0, 0, .4);
+    font-weight: 700;
+    z-index: 1000;
+}
+
 .groups-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
