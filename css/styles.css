@@ -116,25 +116,27 @@ main {
     font-size: 14px;
 }
 
-.team-slots-grid {
+.fixed-team-list {
+    list-style: none;
     display: grid;
     gap: 8px;
     margin-bottom: 12px;
 }
 
-.team-slot {
+.fixed-team-list li {
     display: grid;
-    gap: 4px;
-    color: #d7e7f5;
-    font-size: 13px;
-}
-
-.team-slot select {
-    border: none;
-    border-radius: 8px;
+    grid-template-columns: 22px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    min-height: 36px;
     padding: 8px 10px;
     background: rgba(255, 255, 255, .12);
-    color: white;
+    border-radius: 8px;
+}
+
+.fixed-team-list small {
+    color: #9fc4e4;
+    font-weight: 700;
 }
 
 .results-panels {
@@ -172,6 +174,10 @@ main {
 
 .standing-row.qualifier {
     border-left: 3px solid #f4b400;
+}
+
+.standing-row.third-place {
+    border-left: 3px solid #6aa9e9;
 }
 
 .standing-pos {
@@ -218,19 +224,23 @@ main {
     text-align: center;
 }
 
+.table-title {
+    margin: 4px 0 10px;
+    color: #f4b400;
+}
+
 .bracket-grid {
     display: grid;
     gap: 18px;
 }
 
-.qualification-grid {
+.qualification-columns {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     gap: 14px;
     margin-bottom: 16px;
 }
 
-.qualification-card,
 .stage-card {
     background: #10375b;
     padding: 18px;
@@ -238,15 +248,22 @@ main {
     box-shadow: 0 0 10px rgba(0, 0, 0, .28);
 }
 
-.qualification-card h3,
+.qualification-columns > div {
+    background: rgba(255, 255, 255, .05);
+    border-radius: 8px;
+    padding: 12px;
+}
+
+.qualification-columns h4,
 .stage-card h3 {
     color: #f4b400;
     margin-bottom: 8px;
 }
 
-.qualification-card p {
+.qualification-columns p {
     color: #d7e7f5;
     margin-top: 4px;
+    font-size: 14px;
 }
 
 .bracket-list {
@@ -270,21 +287,12 @@ main {
     letter-spacing: .08em;
 }
 
-.match-editor {
+.match-line {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
     align-items: center;
-}
-
-.match-editor select {
-    flex: 1;
-    min-width: 180px;
-    border: none;
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, .12);
-    color: white;
+    justify-content: space-between;
 }
 
 .match-vs {

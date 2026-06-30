@@ -1,6 +1,8 @@
 const app = document.getElementById("app");
 let currentView = "home";
 
+const groupNames = Object.keys(window.groups ?? {});
+
 const getTeam = (code) => window.teams?.[code] ?? {
     code,
     name: code.startsWith("TBD") ? "Por definir" : code,
@@ -11,6 +13,7 @@ const getTeam = (code) => window.teams?.[code] ?? {
 
 function buildFixtures(teamCodes) {
     const teams = teamCodes.slice(0, 4);
+
     return [
         { home: teams[0], away: teams[1], homeGoals: "", awayGoals: "" },
         { home: teams[2], away: teams[3], homeGoals: "", awayGoals: "" },
@@ -21,26 +24,23 @@ function buildFixtures(teamCodes) {
     ];
 }
 
-function buildBracketTemplate() {
-    return Array.from({ length: 16 }, () => ({ home: "", away: "" }));
-}
-
 function buildInitialState() {
-    const groupEntries = Object.entries(window.groups ?? {});
     return {
-        groups: Object.fromEntries(groupEntries.map(([groupName, teamCodes]) => [groupName, [...teamCodes]])),
-        realResults: Object.fromEntries(groupEntries.map(([groupName, teamCodes]) => [groupName, buildFixtures(teamCodes)])),
-        forecastResults: Object.fromEntries(groupEntries.map(([groupName, teamCodes]) => [groupName, buildFixtures(teamCodes)])),
-        realBracket: buildBracketTemplate(),
-        forecastBracket: buildBracketTemplate()
+        realResults: Object.fromEntries(groupNames.map((groupName) => [
+            groupName,
+            buildFixtures(window.groups[groupName])
+        ])),
+        forecastResults: Object.fromEntries(groupNames.map((groupName) => [
+            groupName,
+            buildFixtures(window.groups[groupName])
+        ]))
     };
 }
 
 let state = JSON.parse(JSON.stringify(buildInitialState()));
 
 function getGroupTeams(groupName) {
-    const teams = state.groups?.[groupName] ?? [];
-    return teams.filter(Boolean);
+    return window.groups?.[groupName] ?? [];
 }
 
 function getGroupResults(groupName, mode) {
@@ -51,10 +51,16 @@ function getGroupResults(groupName, mode) {
 function updateGroupResult(mode, groupName, fixtureIndex, side, value) {
     const results = mode === "forecast" ? state.forecastResults : state.realResults;
     const fixture = results[groupName]?.[fixtureIndex];
+
     if (!fixture) {
         return;
     }
+
     fixture[side === "home" ? "homeGoals" : "awayGoals"] = value;
+}
+
+function isResultComplete(fixture) {
+    return fixture.homeGoals !== "" && fixture.awayGoals !== "";
 }
 
 function getGroupStandings(groupName, mode) {
@@ -62,6 +68,7 @@ function getGroupStandings(groupName, mode) {
     const fixtures = getGroupResults(groupName, mode);
     const table = teamCodes.map((code) => ({
         code,
+        groupName,
         played: 0,
         wins: 0,
         draws: 0,
@@ -72,15 +79,16 @@ function getGroupStandings(groupName, mode) {
         pts: 0
     }));
 
-    fixtures.forEach((fixture) => {
+    fixtures.filter(isResultComplete).forEach((fixture) => {
         const home = table.find((entry) => entry.code === fixture.home);
         const away = table.find((entry) => entry.code === fixture.away);
+
         if (!home || !away) {
             return;
         }
 
-        const homeGoals = Number(fixture.homeGoals || 0);
-        const awayGoals = Number(fixture.awayGoals || 0);
+        const homeGoals = Number(fixture.homeGoals);
+        const awayGoals = Number(fixture.awayGoals);
 
         home.played += 1;
         away.played += 1;
@@ -107,126 +115,143 @@ function getGroupStandings(groupName, mode) {
         }
     });
 
-    return table.sort((a, b) => {
-        if (b.pts !== a.pts) return b.pts - a.pts;
-        if (b.gd !== a.gd) return b.gd - a.gd;
-        if (b.gf !== a.gf) return b.gf - a.gf;
-        return a.code.localeCompare(b.code);
-    });
+    return table.sort(compareTeams);
+}
+
+function compareTeams(a, b) {
+    if (b.pts !== a.pts) return b.pts - a.pts;
+    if (b.gd !== a.gd) return b.gd - a.gd;
+    if (b.gf !== a.gf) return b.gf - a.gf;
+    return a.code.localeCompare(b.code);
 }
 
 function getGroupSummary(mode) {
-    return Object.entries(state.groups ?? {}).map(([groupName]) => ({
+    return groupNames.map((groupName) => ({
         groupName,
         standings: getGroupStandings(groupName, mode)
     }));
 }
 
-function getBracketMatches(mode) {
-    return mode === "forecast" ? state.forecastBracket : state.realBracket;
+function getQualifiedTeams(mode) {
+    const groups = getGroupSummary(mode);
+    const firsts = groups.map(({ standings }) => standings[0]);
+    const seconds = groups.map(({ standings }) => standings[1]);
+    const thirds = groups.map(({ standings }) => standings[2]).sort(compareTeams).slice(0, 8);
+
+    return { firsts, seconds, thirds };
 }
 
-function updateBracketMatch(mode, matchIndex, side, value) {
-    const bracket = mode === "forecast" ? state.forecastBracket : state.realBracket;
-    bracket[matchIndex][side] = value;
+function getRoundOf32(mode) {
+    const { firsts, seconds, thirds } = getQualifiedTeams(mode);
+
+    return [
+        [firsts[0], thirds[7]],
+        [firsts[1], thirds[6]],
+        [firsts[2], thirds[5]],
+        [firsts[3], thirds[4]],
+        [firsts[4], thirds[3]],
+        [firsts[5], thirds[2]],
+        [firsts[6], thirds[1]],
+        [firsts[7], thirds[0]],
+        [firsts[8], seconds[11]],
+        [firsts[9], seconds[10]],
+        [firsts[10], seconds[9]],
+        [firsts[11], seconds[8]],
+        [seconds[0], seconds[1]],
+        [seconds[2], seconds[3]],
+        [seconds[4], seconds[5]],
+        [seconds[6], seconds[7]]
+    ];
 }
 
 function renderHomeView() {
     return `
         <div class="card">
             <h2>Bienvenido</h2>
-            <p>Ahora la app permite cargar los grupos reales, separar el resultado real del pronóstico y editar las llaves manualmente.</p>
+            <p>Los grupos quedan fijos. Los usuarios cargan resultados y la app arma automaticamente clasificados y llaves.</p>
             <div class="actions">
-                <button id="official">Ver grupos</button>
-                <button id="forecast">Ir al pronóstico</button>
+                <button id="official">Cargar resultados</button>
+                <button id="forecast">Ver llaves</button>
             </div>
         </div>
     `;
 }
 
-function renderTeamSelector(groupName, index) {
-    const currentCode = state.groups[groupName]?.[index] || "";
-    const options = [...new Set([...(Object.keys(window.teams || {})), ...Object.values(state.groups).flatMap((codes) => codes.filter(Boolean))])];
+function renderFixedTeamList(groupName) {
+    return `
+        <ul class="fixed-team-list">
+            ${getGroupTeams(groupName).map((code) => `
+                <li>
+                    <span>${getTeam(code).flag}</span>
+                    <strong>${getTeam(code).name}</strong>
+                    <small>${code}</small>
+                </li>
+            `).join("")}
+        </ul>
+    `;
+}
+
+function renderResultPanel(groupName, mode, title) {
+    const fixtures = getGroupResults(groupName, mode);
 
     return `
-        <label class="team-slot">
-            <span>Slot ${index + 1}</span>
-            <select data-role="team-slot" data-group="${groupName}" data-index="${index}">
-                <option value="">Por definir</option>
-                ${options.map((code) => `
-                    <option value="${code}" ${code === currentCode ? "selected" : ""}>${getTeam(code).flag} ${getTeam(code).name}</option>
+        <div class="result-panel">
+            <h4>${title}</h4>
+            <div class="group-fixtures">
+                ${fixtures.map((fixture, index) => `
+                    <div class="fixture-row">
+                        <span class="fixture-team">${getTeam(fixture.home).name}</span>
+                        <input data-mode="${mode}" data-group="${groupName}" data-fixture="${index}" data-side="home" type="number" min="0" inputmode="numeric" value="${fixture.homeGoals}">
+                        <span class="fixture-separator">-</span>
+                        <input data-mode="${mode}" data-group="${groupName}" data-fixture="${index}" data-side="away" type="number" min="0" inputmode="numeric" value="${fixture.awayGoals}">
+                        <span class="fixture-team">${getTeam(fixture.away).name}</span>
+                    </div>
                 `).join("")}
-            </select>
-        </label>
+            </div>
+        </div>
+    `;
+}
+
+function renderStandings(groupName, mode) {
+    const standings = getGroupStandings(groupName, mode);
+
+    return `
+        <ol class="standings-list">
+            ${standings.map((team, index) => `
+                <li class="standing-row ${index < 2 ? "qualifier" : ""} ${index === 2 ? "third-place" : ""}">
+                    <span class="standing-pos">${index + 1}</span>
+                    <span class="standing-team">${getTeam(team.code).flag} ${getTeam(team.code).name}</span>
+                    <span class="standing-points">${team.pts} pts</span>
+                </li>
+            `).join("")}
+        </ol>
     `;
 }
 
 function renderGroupsView() {
-    const groupsMarkup = Object.entries(state.groups ?? {}).map(([groupName]) => {
-        const standings = getGroupStandings(groupName, "real");
-        const realFixtures = getGroupResults(groupName, "real");
-        const forecastFixtures = getGroupResults(groupName, "forecast");
+    const groupsMarkup = groupNames.map((groupName) => `
+        <section class="group-card">
+            <div class="group-card-header">
+                <h3>Grupo ${groupName}</h3>
+                <p>Equipos fijos. Solo se editan los resultados.</p>
+            </div>
 
-        return `
-            <section class="group-card">
-                <div class="group-card-header">
-                    <h3>Grupo ${groupName}</h3>
-                    <p>Elegí los equipos del grupo y completá los resultados.</p>
-                </div>
+            ${renderFixedTeamList(groupName)}
 
-                <div class="team-slots-grid">
-                    ${[0, 1, 2, 3].map((index) => renderTeamSelector(groupName, index)).join("")}
-                </div>
+            <div class="results-panels">
+                ${renderResultPanel(groupName, "real", "Resultado real")}
+                ${renderResultPanel(groupName, "forecast", "Pronostico")}
+            </div>
 
-                <div class="results-panels">
-                    <div class="result-panel">
-                        <h4>Resultado real</h4>
-                        <div class="group-fixtures">
-                            ${realFixtures.map((fixture, index) => `
-                                <div class="fixture-row">
-                                    <span class="fixture-team">${getTeam(fixture.home).name}</span>
-                                    <input data-mode="real" data-group="${groupName}" data-fixture="${index}" data-side="home" type="number" min="0" inputmode="numeric" value="${fixture.homeGoals}">
-                                    <span class="fixture-separator">-</span>
-                                    <input data-mode="real" data-group="${groupName}" data-fixture="${index}" data-side="away" type="number" min="0" inputmode="numeric" value="${fixture.awayGoals}">
-                                    <span class="fixture-team">${getTeam(fixture.away).name}</span>
-                                </div>
-                            `).join("")}
-                        </div>
-                    </div>
-
-                    <div class="result-panel">
-                        <h4>Pronóstico</h4>
-                        <div class="group-fixtures">
-                            ${forecastFixtures.map((fixture, index) => `
-                                <div class="fixture-row">
-                                    <span class="fixture-team">${getTeam(fixture.home).name}</span>
-                                    <input data-mode="forecast" data-group="${groupName}" data-fixture="${index}" data-side="home" type="number" min="0" inputmode="numeric" value="${fixture.homeGoals}">
-                                    <span class="fixture-separator">-</span>
-                                    <input data-mode="forecast" data-group="${groupName}" data-fixture="${index}" data-side="away" type="number" min="0" inputmode="numeric" value="${fixture.awayGoals}">
-                                    <span class="fixture-team">${getTeam(fixture.away).name}</span>
-                                </div>
-                            `).join("")}
-                        </div>
-                    </div>
-                </div>
-
-                <ol class="standings-list">
-                    ${standings.map((team, index) => `
-                        <li class="standing-row ${index < 2 ? "qualifier" : ""}">
-                            <span class="standing-pos">${index + 1}</span>
-                            <span class="standing-team">${getTeam(team.code).flag} ${getTeam(team.code).name}</span>
-                            <span class="standing-points">${team.pts} pts</span>
-                        </li>
-                    `).join("")}
-                </ol>
-            </section>
-        `;
-    }).join("");
+            <h4 class="table-title">Tabla por resultado real</h4>
+            ${renderStandings(groupName, "real")}
+        </section>
+    `).join("");
 
     return `
         <div class="card">
             <h2>Fase de Grupos</h2>
-            <p>Podés corregir los equipos de cada grupo y completar los resultados reales y los pronósticos por separado.</p>
+            <p>Los grupos ya no se modifican desde la pantalla. Carga marcadores y la tabla se recalcula al instante.</p>
         </div>
 
         <div class="groups-grid">
@@ -235,59 +260,62 @@ function renderGroupsView() {
     `;
 }
 
+function renderQualificationSummary(mode) {
+    const { firsts, seconds, thirds } = getQualifiedTeams(mode);
+
+    return `
+        <div class="qualification-columns">
+            <div>
+                <h4>Primeros</h4>
+                ${firsts.map((team) => `<p>${team.groupName}: ${getTeam(team.code).name}</p>`).join("")}
+            </div>
+            <div>
+                <h4>Segundos</h4>
+                ${seconds.map((team) => `<p>${team.groupName}: ${getTeam(team.code).name}</p>`).join("")}
+            </div>
+            <div>
+                <h4>Mejores terceros</h4>
+                ${thirds.map((team) => `<p>${team.groupName}: ${getTeam(team.code).name} (${team.pts} pts)</p>`).join("")}
+            </div>
+        </div>
+    `;
+}
+
+function renderRoundOf32(mode) {
+    return `
+        <div class="bracket-list">
+            ${getRoundOf32(mode).map(([home, away], index) => `
+                <div class="match-card">
+                    <span class="match-label">16avos ${index + 1}</span>
+                    <div class="match-line">
+                        <strong>${home ? getTeam(home.code).name : "Por definir"}</strong>
+                        <span class="match-vs">vs</span>
+                        <strong>${away ? getTeam(away.code).name : "Por definir"}</strong>
+                    </div>
+                </div>
+            `).join("")}
+        </div>
+    `;
+}
+
 function renderBracketView() {
-    const realGroups = getGroupSummary("real");
-    const forecastGroups = getGroupSummary("forecast");
     const bracketModes = [
-        { key: "real", title: "Real", groups: realGroups, matches: getBracketMatches("real") },
-        { key: "forecast", title: "Pronóstico", groups: forecastGroups, matches: getBracketMatches("forecast") }
+        { key: "real", title: "Llave por resultados reales" },
+        { key: "forecast", title: "Llave por pronostico" }
     ];
 
     return `
         <div class="card">
             <h2>Llaves</h2>
-            <p>Podés ajustar las llaves y los cruces tanto para el resultado real como para tu pronóstico.</p>
+            <p>Las llaves se arman automaticamente desde las tablas: pasan los dos primeros de cada grupo y los ocho mejores terceros.</p>
         </div>
 
         <div class="bracket-grid">
-            ${bracketModes.map(({ key, title, groups, matches }) => `
+            ${bracketModes.map(({ key, title }) => `
                 <section class="stage-card">
                     <h3>${title}</h3>
-                    <div class="qualification-grid">
-                        ${groups.map(({ groupName, standings }) => `
-                            <div class="qualification-card">
-                                <h3>Grupo ${groupName}</h3>
-                                <p>1. ${getTeam(standings[0].code).name}</p>
-                                <p>2. ${getTeam(standings[1].code).name}</p>
-                            </div>
-                        `).join("")}
-                    </div>
-
-                    <div class="bracket-list">
-                        ${matches.map((match, index) => {
-                            const availableTeams = groups.flatMap(({ standings }) => standings.map((team) => team.code));
-                            return `
-                                <div class="match-card">
-                                    <span class="match-label">Partido ${index + 1}</span>
-                                    <div class="match-editor">
-                                        <select data-mode="${key}" data-match="${index}" data-side="home">
-                                            <option value="">Elegí un equipo</option>
-                                            ${availableTeams.map((code) => `
-                                                <option value="${code}" ${match.home === code ? "selected" : ""}>${getTeam(code).flag} ${getTeam(code).name}</option>
-                                            `).join("")}
-                                        </select>
-                                        <span class="match-vs">vs</span>
-                                        <select data-mode="${key}" data-match="${index}" data-side="away">
-                                            <option value="">Elegí un equipo</option>
-                                            ${availableTeams.map((code) => `
-                                                <option value="${code}" ${match.away === code ? "selected" : ""}>${getTeam(code).flag} ${getTeam(code).name}</option>
-                                            `).join("")}
-                                        </select>
-                                    </div>
-                                </div>
-                            `;
-                        }).join("")}
-                    </div>
+                    ${renderQualificationSummary(key)}
+                    ${renderRoundOf32(key)}
                 </section>
             `).join("")}
         </div>
@@ -326,23 +354,9 @@ document.addEventListener("click", (event) => {
 document.addEventListener("change", (event) => {
     const target = event.target;
 
-    if (target.dataset.role === "team-slot") {
-        const { group, index } = target.dataset;
-        state.groups[group][index] = target.value;
-        loadView(currentView);
-        return;
-    }
-
     if (target.matches("input[data-mode][data-group][data-fixture][data-side]")) {
         const { mode, group, fixture, side } = target.dataset;
         updateGroupResult(mode, group, fixture, side, target.value);
-        loadView(currentView);
-        return;
-    }
-
-    if (target.matches("select[data-mode][data-match][data-side]")) {
-        const { mode, match, side } = target.dataset;
-        updateBracketMatch(mode, match, side, target.value);
         loadView(currentView);
     }
 });
